@@ -6,19 +6,24 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
 }
 include '../db.php';
 
+// Total non-admin users
 $user_result = $conn->query("SELECT COUNT(*) as total_users FROM users WHERE role != 'admin'");
 $user_data = $user_result->fetch_assoc();
 $total_users = $user_data['total_users'] ?? 0;
 
+// Total contact messages
 $message_result = $conn->query("SELECT COUNT(*) as total_messages FROM contact_messages");
 $message_data = $message_result->fetch_assoc();
 $total_messages = $message_data['total_messages'] ?? 0;
 
-$pending_approvals = 25;
+// Pending approvals
+$approval_result = $conn->query("SELECT COUNT(*) as total_pending FROM job_applications WHERE status = 'pending'");
+$approval_data = $approval_result->fetch_assoc();
+$pending_approvals = $approval_data['total_pending'] ?? 0;
 ?>
 
 <!DOCTYPE html>
-<html lang="en" class="">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>Admin Panel</title>
@@ -37,15 +42,12 @@ $pending_approvals = 25;
     <a href="../home.php" class="text-blue-600 dark:text-white hover:text-blue-400">Home</a>
     <a href="../about.php" class="hover:text-blue-500 dark:text-white">About</a>
     <a href="../contact.php" class="hover:text-blue-500 dark:text-white">Contact</a>
-    <?php if ($_SESSION['role'] === 'admin'): ?>
-      <a href="admin.php" class="text-blue-600 dark:text-white hover:text-blue-400">
-        <i class="fas fa-cogs mr-1"></i> Admin Panel
-      </a>
-    <?php endif; ?>
+    <a href="admin.php" class="text-blue-600 dark:text-white hover:text-blue-400">
+      <i class="fas fa-cogs mr-1"></i> Admin Panel
+    </a>
     <a href="../logout.php" class="text-blue-600 dark:text-white hover:text-blue-400">
       <i class="fas fa-sign-out-alt mr-1"></i> Logout
     </a>
-    <!-- Theme Toggle Button -->
     <button id="themeToggle" class="text-xl text-gray-700 dark:text-yellow-300 hover:text-yellow-500">
       <i class="fas fa-moon"></i>
     </button>
@@ -54,42 +56,18 @@ $pending_approvals = 25;
 
 <div class="flex min-h-screen">
   <!-- Sidebar -->
- <!-- Sidebar -->
-<div class="w-64 bg-blue-600 text-white p-6">
-  <h2 class="text-2xl font-bold mb-6">Admin Panel</h2>
-  <ul class="space-y-4">
-    <li>
-      <a href="admin.php" class="flex items-center hover:bg-blue-500 p-2 rounded">
-        <i class="fas fa-tachometer-alt mr-3"></i> Dashboard
-      </a>
-    </li>
-    <li>
-      <a href="manage-users.php" class="flex items-center hover:bg-blue-500 p-2 rounded">
-        <i class="fas fa-users mr-3"></i> Manage Users
-      </a>
-    </li>
-    <li>
-      <a href="view-messages.php" class="flex items-center hover:bg-blue-500 p-2 rounded">
-        <i class="fas fa-envelope mr-3"></i> View Messages
-      </a>
-    </li>
-    <li>
-      <a href="job-applications.php" class="flex items-center hover:bg-blue-500 p-2 rounded">
-        <i class="fas fa-briefcase mr-3"></i> Job Applications
-      </a>
-    </li>
-    <li>
-      <a href="settings.php" class="flex items-center hover:bg-blue-500 p-2 rounded">
-        <i class="fas fa-cogs mr-3"></i> Settings
-      </a>
-    </li>
-    <li>
-      <a href="../logout.php" class="flex items-center hover:bg-blue-500 p-2 rounded">
-        <i class="fas fa-sign-out-alt mr-3"></i> Logout
-      </a>
-    </li>
-  </ul>
-</div>
+  <div class="w-64 bg-blue-600 text-white p-6">
+    <h2 class="text-2xl font-bold mb-6">Admin Panel</h2>
+    <ul class="space-y-4">
+      <li><a href="admin.php" class="flex items-center hover:bg-blue-500 p-2 rounded"><i class="fas fa-tachometer-alt mr-3"></i> Dashboard</a></li>
+      <li><a href="manage-users.php" class="flex items-center hover:bg-blue-500 p-2 rounded"><i class="fas fa-users mr-3"></i> Manage Users</a></li>
+      <li><a href="view-messages.php" class="flex items-center hover:bg-blue-500 p-2 rounded"><i class="fas fa-envelope mr-3"></i> View Messages</a></li>
+      <li><a href="job-applications.php" class="flex items-center hover:bg-blue-500 p-2 rounded"><i class="fas fa-briefcase mr-3"></i> Job Applications</a></li>
+      <li><a href="list-job.php" class="flex items-center hover:bg-blue-500 p-2 rounded"><i class="fas fa-list mr-3"></i> Jobs List</a></li>
+      <li><a href="add-job.php" class="flex items-center hover:bg-blue-500 p-2 rounded"><i class="fas fa-plus mr-3"></i> Add Job</a></li>
+      <li><a href="../logout.php" class="flex items-center hover:bg-blue-500 p-2 rounded"><i class="fas fa-sign-out-alt mr-3"></i> Logout</a></li>
+    </ul>
+  </div>
 
   <!-- Main Content -->
   <div class="flex-1 p-8">
@@ -111,19 +89,9 @@ $pending_approvals = 25;
     </div>
 
     <!-- Chart -->
-    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-8">
+    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
       <h2 class="text-xl font-semibold text-blue-700 dark:text-white mb-4">User Stats</h2>
       <canvas id="userChart" height="120"></canvas>
-    </div>
-
-    <!-- Activity Log -->
-    <div class="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-      <h2 class="text-2xl font-semibold text-blue-700 dark:text-white mb-4">Recent Activity</h2>
-      <ul class="space-y-4">
-        <li class="flex items-center"><i class="fas fa-user-plus text-green-500 mr-3"></i> New user registration (John Doe) <span class="text-sm text-gray-500 ml-auto">5 mins ago</span></li>
-        <li class="flex items-center"><i class="fas fa-user-clock text-yellow-500 mr-3"></i> Pending approval (Jane Smith) <span class="text-sm text-gray-500 ml-auto">10 mins ago</span></li>
-        <li class="flex items-center"><i class="fas fa-chart-line text-blue-500 mr-3"></i> Weekly report generated <span class="text-sm text-gray-500 ml-auto">20 mins ago</span></li>
-      </ul>
     </div>
   </div>
 </div>

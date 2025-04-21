@@ -1,5 +1,11 @@
 <?php
+session_start();
 include 'db.php';
+
+if (!isset($_SESSION['user_id'])) {
+    die("You must be logged in to apply.");
+}
+$user_id = $_SESSION['user_id'];
 
 $job_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
 $job = null;
@@ -14,10 +20,12 @@ if ($job_id > 0) {
     $stmt->close();
 }
 
-if ($_SERVER["REQUEST_METHOD"] === "POST") {
-    $name = $_POST['name'];
+if ($_SERVER["REQUEST_METHOD"] === "POST" && $job) {
+    $applicant_name = $_POST['name'];
     $email = $_POST['email'];
     $message = $_POST['message'];
+    $job_title = $job['title'];
+    $company_name = $job['company_name'];
 
     if (isset($_FILES['resume']) && $_FILES['resume']['error'] === UPLOAD_ERR_OK) {
         $fileTmp = $_FILES['resume']['tmp_name'];
@@ -28,8 +36,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $uploadPath = 'uploads/' . time() . '_' . $fileName;
             move_uploaded_file($fileTmp, $uploadPath);
 
-            $stmt = $conn->prepare("INSERT INTO job_applications (job_id, applicant_name, email, resume, message) VALUES (?, ?, ?, ?, ?)");
-            $stmt->bind_param("issss", $job_id, $name, $email, $uploadPath, $message);
+            $stmt = $conn->prepare("INSERT INTO job_applications (job_id, user_id, job_title, company_name, applicant_name, email, resume, message) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->bind_param("iissssss", $job_id, $user_id, $job_title, $company_name, $applicant_name, $email, $uploadPath, $message);
             $stmt->execute();
             $stmt->close();
             $success = true;

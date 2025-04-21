@@ -22,9 +22,6 @@ include_once __DIR__ . '/header.php'; // Assuming your navbar is in header.php
         <li>Save time and reduce stress</li>
       </ul>
     </div>
-    <div>
-      <img src="assets/images/about-illustration.svg" alt="About Illustration" class="rounded-xl shadow-lg">
-    </div>
   </div>
 </section>
 

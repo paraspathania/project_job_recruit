@@ -45,7 +45,7 @@ include_once __DIR__ . '/header.php';
     </div>
     <div>
       <i class="fas fa-map-marker-alt text-xl mb-2"></i>
-      <p>New York, NY</p>
+      <p>Jalandhar, Punjab</p>
     </div>
   </div>
 </section>

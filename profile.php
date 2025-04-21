@@ -26,7 +26,6 @@ if ($result->num_rows === 1) {
 }
 ?>
 
-<!-- // Show upload status alerts -->
 <?php if (isset($_GET['upload'])): ?>
     <div class="max-w-4xl mx-auto mb-4" id="uploadMessage">
         <?php if ($_GET['upload'] === 'success'): ?>
@@ -42,7 +41,6 @@ if ($result->num_rows === 1) {
 <?php endif; ?>
 
 <?php
-// Resume file check
 $resumeExists = false;
 $resumeFilePath = '';
 $resumeExtensions = ['pdf', 'doc', 'docx', 'csv'];
@@ -102,14 +100,23 @@ foreach ($resumeExtensions as $ext) {
         <div class="md:col-span-2 bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-md transition-all duration-300 hover:shadow-lg">
             <h3 class="text-xl font-semibold text-blue-600 dark:text-blue-300 mb-4">📌 Applied Jobs</h3>
             <ul class="space-y-3 text-gray-700 dark:text-gray-300">
-                <li class="flex justify-between items-center bg-gray-100 dark:bg-gray-700 p-3 rounded-lg">
-                    <span>Frontend Developer at XYZ</span>
-                    <span class="text-sm text-green-600">Applied on Jan 5, 2025</span>
-                </li>
-                <li class="flex justify-between items-center bg-gray-100 dark:bg-gray-700 p-3 rounded-lg">
-                    <span>Backend Developer at ABC</span>
-                    <span class="text-sm text-green-600">Applied on Mar 22, 2025</span>
-                </li>
+                <?php
+                $stmt = $conn->prepare("SELECT job_title, company_name, applied_at FROM job_applications WHERE user_id = ? ORDER BY applied_at DESC");
+                $stmt->bind_param("i", $user_id);
+                $stmt->execute();
+                $applied_jobs = $stmt->get_result();
+
+                if ($applied_jobs->num_rows > 0) {
+                    while ($job = $applied_jobs->fetch_assoc()) {
+                        echo '<li class="flex justify-between items-center bg-gray-100 dark:bg-gray-700 p-3 rounded-lg">';
+                        echo '<span>' . htmlspecialchars($job['job_title']) . ' at ' . htmlspecialchars($job['company_name']) . '</span>';
+                        echo '<span class="text-sm text-green-600">Applied on ' . date('M d, Y', strtotime($job['applied_at'])) . '</span>';
+                        echo '</li>';
+                    }
+                } else {
+                    echo '<p>No job applications yet.</p>';
+                }
+                ?>
             </ul>
         </div>
     </div>
@@ -127,9 +134,7 @@ foreach ($resumeExtensions as $ext) {
             }
         }
     });
-    
-    <script>
-    // Hide the message after 5 seconds
+
     const uploadMessage = document.getElementById("uploadMessage");
     if (uploadMessage) {
         setTimeout(() => {
@@ -137,6 +142,5 @@ foreach ($resumeExtensions as $ext) {
         }, 5000);
     }
 </script>
-
 
 <?php include 'footer.php'; ?>

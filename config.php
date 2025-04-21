@@ -1,2 +1,2 @@
 <?php
-define('BASE_URL', '/CA2');
+define('BASE_URL', '/project');
