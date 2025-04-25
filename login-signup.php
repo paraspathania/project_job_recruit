@@ -2,49 +2,75 @@
 session_start();
 include 'db.php';
 
-$error = "";
-$success = "";
+$signupError = $signupSuccess = "";
+$loginError = "";
 
-// Signup Logic
+// --- Signup Logic ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['signup'])) {
     $username = trim($_POST['username']);
     $email = trim($_POST['email']);
     $password = $_POST['password'];
 
     if (empty($username) || empty($email) || empty($password)) {
-        $error = "All fields are required for sign up.";
+        $signupError = "All fields are required.";
+    } elseif (!preg_match('/^[a-zA-Z0-9_]{3,}$/', $username)) {
+        $signupError = "Username must be at least 3 characters and contain only letters, numbers, or underscores.";
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $signupError = "Invalid email format.";
+    } elseif (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?#&])[A-Za-z\d@$!%*?#&]{8,}$/', $password)) {
+        $signupError = "Password must be at least 8 characters, include uppercase, lowercase, number, and special character.";
     } else {
-        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-        $sql = "INSERT INTO users (username, email, password, role) VALUES ('$username', '$email', '$hashed_password', 'user')";
-        if ($conn->query($sql) === TRUE) {
-            $success = "Sign up successful! Please log in.";
+        $stmt = $conn->prepare("SELECT id FROM users WHERE email = ?");
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+        $stmt->store_result();
+
+        if ($stmt->num_rows > 0) {
+            $signupError = "Email already exists. Try logging in.";
         } else {
-            $error = "Email already exists or something went wrong.";
+            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+            $stmt = $conn->prepare("INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, 'user')");
+            $stmt->bind_param("sss", $username, $email, $hashed_password);
+            if ($stmt->execute()) {
+                $signupSuccess = "Sign up successful! You can now log in.";
+            } else {
+                $signupError = "Something went wrong. Please try again.";
+            }
         }
+        $stmt->close();
     }
 }
 
-// Login Logic
+// --- Login Logic ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
     $email = trim($_POST['email']);
     $password = $_POST['password'];
 
-    $sql = "SELECT * FROM users WHERE email = '$email'";
-    $result = $conn->query($sql);
-
-    if ($result->num_rows > 0) {
-        $user = $result->fetch_assoc();
-        if (password_verify($password, $user['password'])) {
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['username'] = $user['username'];
-            $_SESSION['role'] = $user['role'];
-            header("Location: home.php");
-            exit();
-        } else {
-            $error = "Incorrect password!";
-        }
+    if (empty($email) || empty($password)) {
+        $loginError = "Both email and password are required.";
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $loginError = "Invalid email format.";
     } else {
-        $error = "User not found!";
+        $stmt = $conn->prepare("SELECT * FROM users WHERE email = ?");
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        if ($result->num_rows > 0) {
+            $user = $result->fetch_assoc();
+            if (password_verify($password, $user['password'])) {
+                $_SESSION['user_id'] = $user['id'];
+                $_SESSION['username'] = $user['username'];
+                $_SESSION['role'] = $user['role'];
+                header("Location: home.php");
+                exit();
+            } else {
+                $loginError = "Incorrect password!";
+            }
+        } else {
+            $loginError = "No account found with that email.";
+        }
+        $stmt->close();
     }
 }
 ?>
@@ -56,9 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Login / Sign Up</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = { darkMode: 'class' }
-  </script>
+  <script>tailwind.config = { darkMode: 'class' }</script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
 </head>
 <body class="bg-gray-100 text-gray-800 transition-colors duration-300">
@@ -76,15 +100,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
 
 <!-- Form Card -->
 <div class="max-w-md mx-auto mt-12 p-6 bg-white dark:bg-gray-800 shadow-lg rounded-lg transition-all duration-500">
-  <?php if ($error): ?>
-    <div class="bg-red-100 text-red-700 p-2 mb-4 rounded"><?= $error ?></div>
-  <?php elseif ($success): ?>
-    <div class="bg-green-100 text-green-700 p-2 mb-4 rounded"><?= $success ?></div>
-  <?php endif; ?>
 
   <!-- Login Form -->
   <form method="POST" id="login-form" class="space-y-4 transition-all duration-300">
     <h2 class="text-2xl font-bold">Login</h2>
+
+    <?php if ($loginError): ?>
+      <div class="bg-red-100 text-red-700 p-2 mb-2 rounded"><?= $loginError ?></div>
+    <?php endif; ?>
+
     <input type="email" name="email" class="w-full p-2 border rounded dark:bg-gray-700" placeholder="Email" required />
     <input type="password" name="password" class="w-full p-2 border rounded dark:bg-gray-700" placeholder="Password" required />
     <button type="submit" name="login" class="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded">Login</button>
@@ -98,6 +122,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
   <!-- Signup Form -->
   <form method="POST" id="signup-form" class="space-y-4 hidden transition-all duration-300">
     <h2 class="text-2xl font-bold">Sign Up</h2>
+
+    <?php if ($signupError): ?>
+      <div class="bg-red-100 text-red-700 p-2 mb-2 rounded"><?= $signupError ?></div>
+    <?php elseif ($signupSuccess): ?>
+      <div class="bg-green-100 text-green-700 p-2 mb-2 rounded"><?= $signupSuccess ?></div>
+    <?php endif; ?>
+
     <input type="text" name="username" class="w-full p-2 border rounded dark:bg-gray-700" placeholder="Username" required />
     <input type="email" name="email" class="w-full p-2 border rounded dark:bg-gray-700" placeholder="Email" required />
     <input type="password" name="password" class="w-full p-2 border rounded dark:bg-gray-700" placeholder="Password" required />
@@ -112,10 +143,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
 
 <script>
 function toggleForm(formType) {
-  const login = document.getElementById('login-form');
-  const signup = document.getElementById('signup-form');
-  login.classList.toggle('hidden', formType === 'signup');
-  signup.classList.toggle('hidden', formType === 'login');
+  document.getElementById('login-form').classList.toggle('hidden', formType === 'signup');
+  document.getElementById('signup-form').classList.toggle('hidden', formType === 'login');
 }
 
 function toggleDarkMode() {
